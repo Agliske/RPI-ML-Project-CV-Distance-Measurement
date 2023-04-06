@@ -1,8 +1,8 @@
 # This is a sample Python script.
 import cv2
 import numpy as np
-
-
+import PIL
+import matplotlib.pyplot as plt
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
@@ -22,7 +22,7 @@ def findArucoMarkers(frame, draw = True):
 
     return corners, ids
 
-def BoundingBox(frame,corners,ids,draw = True):
+def boundingBox(frame,corners,ids,draw = True):
 
     cornersArray = np.array(corners)
 
@@ -36,36 +36,49 @@ def BoundingBox(frame,corners,ids,draw = True):
 
             corners_ordered[int(ArID)] = corners[i_count]
             ids_ordered[int(ArID)] = ids[i_count]
-
-
-
             i_count = i_count + 1
 
         # print('ids_ordered = ', ids_ordered)
         MarkerCenters = [0, 0, 0, 0]
-        i_count = 0
-        for i in range(len(corners)): #find centers of all detected arUco markers
-            x_sum = corners_ordered[i][0][0][0] + corners_ordered[i][0][1][0] + corners_ordered[i][0][2][0] + corners_ordered[i][0][3][0]
-            y_sum = corners_ordered[i][0][0][1] + corners_ordered[i][0][1][1] + corners_ordered[i][0][2][1] + corners_ordered[i][0][3][1]
 
-            x_centerPixel = x_sum * .25
-            y_centerPixel = y_sum * .25
+        target1 = (corners_ordered[0][0][0][0], corners_ordered[0][0][0][1]) #
+        target2 = (corners_ordered[1][0][1][0], corners_ordered[1][0][1][1])
+        target3 = (corners_ordered[2][0][2][0], corners_ordered[2][0][2][1])
+        target4 = (corners_ordered[3][0][3][0], corners_ordered[3][0][3][1])
+        targetMarkers = [target1,target2,target3,target4]
 
-            MarkerCenters[i] = (int(x_centerPixel),int(y_centerPixel))
-
-            if i_count == 3: #draw box only when MarkerCenters list has been fully populated
-                if draw == True:
-                    cv2.line(frame, MarkerCenters[0], MarkerCenters[1], (0, 255, 0), thickness=2)
-                    cv2.line(frame, MarkerCenters[1], MarkerCenters[2], (0, 255, 0), thickness=2)
-                    cv2.line(frame, MarkerCenters[2], MarkerCenters[3], (0, 255, 0), thickness=2)
-                    cv2.line(frame, MarkerCenters[3], MarkerCenters[0], (0, 255, 0), thickness=2)
-            i_count = i_count + 1
+        # MarkerCenters = [0, 0, 0, 0]
+        # i_count = 0
+        # for i in range(len(corners)): #find centers of all detected arUco markers
+        #     x_sum = corners_ordered[i][0][0][0] + corners_ordered[i][0][1][0] + corners_ordered[i][0][2][0] + corners_ordered[i][0][3][0]
+        #     y_sum = corners_ordered[i][0][0][1] + corners_ordered[i][0][1][1] + corners_ordered[i][0][2][1] + corners_ordered[i][0][3][1]
+        #
+        #     x_centerPixel = x_sum * .25
+        #     y_centerPixel = y_sum * .25
+        #
+        #     MarkerCenters[i] = (int(x_centerPixel),int(y_centerPixel))
+        #
+        #     if i_count == 3: #draw box only when MarkerCenters list has been fully populated
+        #         if draw == True:
+        #             cv2.line(frame, MarkerCenters[0], MarkerCenters[1], (0, 255, 0), thickness=2)
+        #             cv2.line(frame, MarkerCenters[1], MarkerCenters[2], (0, 255, 0), thickness=2)
+        #             cv2.line(frame, MarkerCenters[2], MarkerCenters[3], (0, 255, 0), thickness=2)
+        #             cv2.line(frame, MarkerCenters[3], MarkerCenters[0], (0, 255, 0), thickness=2)
+        #     i_count = i_count + 1
         # print(MarkerCenters)
-        return MarkerCenters
+        if draw == True:
+            cv2.line(frame, targetMarkers[0], targetMarkers[1], (0, 255, 0), thickness=2)
+            cv2.line(frame, targetMarkers[1], targetMarkers[2], (0, 255, 0), thickness=2)
+            cv2.line(frame, targetMarkers[2], targetMarkers[3], (0, 255, 0), thickness=2)
+            cv2.line(frame, targetMarkers[3], targetMarkers[0], (0, 255, 0), thickness=2)
+        return targetMarkers
 
-def PreprocessImage(frame, MarkerCenters):
+def contourCleanup():
+    return None
 
-    if not MarkerCenters:
+def preprocessImage(frame, targetMarkers):
+
+    if not targetMarkers:
         print('tuple is empty')
 
 
@@ -74,7 +87,7 @@ def PreprocessImage(frame, MarkerCenters):
 
         #arranging markers into clockwise order starting with top-left for input into cv2.GetPerspectiveTransform
         #topleft,topright,bottomright,bottomleft
-        cornersArray = np.array(MarkerCenters)
+        cornersArray = np.array(targetMarkers)
 
         # import pdb; pdb.set_trace()
 
@@ -83,22 +96,22 @@ def PreprocessImage(frame, MarkerCenters):
             transInput = np.zeros([4, 2])
             sums = [0, 0, 0, 0]
             diffs = [0, 0, 0, 0]
-            for i in range(len(MarkerCenters)):
-                sums[i] = sum(MarkerCenters[i])
-            for i in range(len(MarkerCenters)):
-                diffs[i] = MarkerCenters[i][0] - MarkerCenters[i][1]
+            for i in range(len(targetMarkers)):
+                sums[i] = sum(targetMarkers[i])
+            for i in range(len(targetMarkers)):
+                diffs[i] = targetMarkers[i][0] - targetMarkers[i][1]
 
             # Top-left point will have the smallest sum.
-            transInput[0, :] = MarkerCenters[sums.index(min(sums))]
+            transInput[0, :] = targetMarkers[sums.index(min(sums))]
 
             # Bottom-right point will have the largest sum.
-            transInput[2, :] = MarkerCenters[sums.index(max(sums))]
+            transInput[2, :] = targetMarkers[sums.index(max(sums))]
 
             # Top-right point will have the smallest difference.
-            transInput[1, :] = MarkerCenters[diffs.index(min(diffs))]
+            transInput[1, :] = targetMarkers[diffs.index(min(diffs))]
 
             # Bottom-left will have the largest difference.
-            transInput[3, :] = MarkerCenters[diffs.index(max(diffs))]
+            transInput[3, :] = targetMarkers[diffs.index(max(diffs))]
 
 
 
@@ -114,15 +127,71 @@ def PreprocessImage(frame, MarkerCenters):
             heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
             maxHeight = max(int(heightA), int(heightB))
             # Final destination co-ordinates.
+
             destination_corners = [[0, 0], [maxWidth, 0], [maxWidth, maxHeight], [0, maxHeight]]
 
+            # print(destination_corners)
 
 
-            matrix = cv2.getPerspectiveTransform(np.float32(MarkerCenters), np.float32(destination_corners))
-            input_image = cv2.warpPerspective(frame, matrix, (maxWidth, maxHeight))
 
-            cv2.imshow('transformed feed', input_image)
+            matrix = cv2.getPerspectiveTransform(np.float32(targetMarkers), np.float32(destination_corners))
+            snipped_image = cv2.warpPerspective(frame, matrix, (maxWidth, maxHeight))
+
+            resized = cv2.resize(snipped_image,(int(9.3*30),int(10*30)))
+            grey = cv2.cvtColor(resized,cv2.COLOR_BGR2GRAY)
+            # blurred = cv2.GaussianBlur(grey,(5,5),0)
+
+            avg_pixel_brightness = np.average(grey)
+            junk, thresh = cv2.threshold(grey,avg_pixel_brightness,255,cv2.THRESH_BINARY_INV)
+
+            # import pdb;
+            # pdb.set_trace()
+
+            contours, heirarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            # drawncont = cv2.drawContours(resized,contours,-1,(0,255,0), 1)
+
+
+            # contourCleanup()
+
+            inputs = []
+
+            # import pdb;
+            # pdb.set_trace()
+
+            iter_count = 0
+            for cont in contours:
+
+                current_img = thresh.copy()
+                x,y,w,h = cv2.boundingRect(cont)
+                drawnRec = cv2.rectangle(resized,(x,y),(x+w,y+h),(0,255,0),2)
+
+                cropped_img = current_img[y:y+h, x:x+w]
+
+
+                # 'epilepsy warning if u try to uncomment this block'
+                # cv2.imshow('cropped image',cropped_img)
+                # cv2.waitKey(1)
+
+                inputs.append(cropped_img)
+
+                iter_count = iter_count + 1
+
+
+            # np.array(inputs)
+            cv2.imshow('transformed feed', drawnRec)
+
+            rows, cols = len(inputs), 1
+            for i in range(0, len(inputs), rows * cols):
+                fig = plt.figure(figsize=(8, 8))
+                for j in range(0, cols * rows):
+                    fig.add_subplot(rows, cols, j + 1)
+                    plt.imshow(inputs[i + j])
+                plt.show()
+
             cv2.waitKey(1)
+
+
+
 
     return None
 
@@ -134,8 +203,8 @@ def main():
     while True:
         success, frame = cap.read()
 
-        corners, ids = findArucoMarkers(frame)
-        MarkerCenters = BoundingBox(frame, corners=corners, ids=ids, draw=True)
+        corners, ids = findArucoMarkers(frame,draw=False)
+        targetMarkers = boundingBox(frame, corners=corners, ids=ids, draw=False)
 
 
         # import pdb;
@@ -143,7 +212,7 @@ def main():
 
         # print('markercenters = ',MarkerCenters)
 
-        PreprocessImage(frame, MarkerCenters)
+        preprocessImage(frame, targetMarkers)
 
         cv2.imshow('Video Feed', frame)
         cv2.waitKey(1)
@@ -155,3 +224,4 @@ if __name__ == '__main__':
     main()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+
