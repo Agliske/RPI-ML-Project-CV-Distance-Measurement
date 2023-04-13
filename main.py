@@ -80,7 +80,7 @@ def contourCleanup():
 def preprocessImage(frame, targetMarkers):
 
     if not targetMarkers:
-        print('tuple is empty')
+        print('Insufficient Fiducials Detected')
 
 
     else:
@@ -147,71 +147,100 @@ def preprocessImage(frame, targetMarkers):
 
             # consider OTSU Threshold***
 
-            # import pdb;
-            # pdb.set_trace()
+
 
             contours, heirarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
             # drawncont = cv2.drawContours(resized,contours,-1,(0,255,0), 1)
 
             cv2.imshow('thresh',thresh)
 
-            # contourCleanup()
-
             rough_inputs = []
+            shape_centers = []
             iter_count = 0
             for cont in contours:
 
                 current_img = thresh.copy()
                 x,y,w,h = cv2.boundingRect(cont)
-                drawnRec = cv2.rectangle(resized,(x,y),(x+w,y+h),(0,255,0),2)
-
                 cropped_img = current_img[y:y+h, x:x+w]
 
-                cont_area = cv2.contourArea(cont)
-                # print(cont_area)
-                if cont_area > 2500 and cont_area < 8000:
-                    rough_inputs.append(cropped_img)
 
+                #filtering the contours: only adding them to list if they have desirable attributes
+                aspectRatio = w / h
+                cont_area = cv2.contourArea(cont)
+                if cont_area > 2500 and cont_area < 8500: #shapes should be of correct size
+                    if aspectRatio < 1.5 and aspectRatio > .80: #shapes should be close to square aspectRatio
+                        # print('cont area:', cont_area, 'aspectRatio:',aspectRatio)
+
+                        center = (x+w//2, y+h//2)
+                        shape_centers.append(center)
+                        rough_inputs.append(cropped_img)
+                        drawnRec = cv2.rectangle(resized, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 iter_count = iter_count + 1
 
+            # print('passed contours = ' , len(rough_inputs))
+
             # resizing image to 128x128
-            inputs = []
+            shapes = []
             targetImageWidth = 128
             targetImageHeight = 128
             for image in rough_inputs:
 
                 imWidth, imHeight = image.shape
-
                 result = np.full((128, 128), 0, dtype=np.uint8)
-                # result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
-
                 x_center = (targetImageWidth - imWidth) // 2
                 y_center = (targetImageHeight - imHeight) // 2
 
+                # import pdb
+                # pdb.set_trace()
+
                 result[x_center:x_center + imWidth, y_center:y_center + imHeight] = image
+                shapes.append(result)
 
-                inputs.append(result)
 
-            # print(inputs)
-            cv2.imshow('transformed feed', drawnRec)
-            # cv2.imshow(inputs[0])
+            # if 'drawnRec' in locals():
+            #     cv2.imshow('transformed feed', drawnRec)
 
-            # rows, cols = len(inputs), 1
-            # for i in range(0, len(inputs), rows * cols):
-            #     fig = plt.figure(figsize=(8, 8))
-            #     for j in range(0, cols * rows):
-            #         fig.add_subplot(rows, cols, j + 1)
-            #         plt.imshow(inputs[i + j])
-            #     plt.show()
-
+            # print(shape_centers)
+            'return drawnRec'
             k = cv2.waitKey(1)
-            return inputs
+            return drawnRec, shapes, shape_centers
 
 
 
 
 
     return None
+
+def drawClassifications(scaledFrame, MLOutputs, shape_centers):
+    # print(len(MLOutputs))
+    iter_count = 0
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    color = (255,255,255)
+    fontScale = 0.5
+    thickness = 2
+
+    for answer in MLOutputs:
+        classNum = np.argmax(MLOutputs[iter_count])
+        # print(classNum)
+
+        if classNum == 0:
+            # print('circle with center', shape_centers[iter_count])
+            cv2.putText(scaledFrame,'Circle',shape_centers[iter_count],font,fontScale,color,thickness)
+
+        if classNum == 1:
+            cv2.putText(scaledFrame, 'Hex', shape_centers[iter_count], font, fontScale, color, thickness)
+            # print('hex detected')
+        #
+        if classNum == 2:
+            cv2.putText(scaledFrame, 'Quad', shape_centers[iter_count], font, fontScale, color, thickness)
+            # print('quad detected')
+        #
+        if classNum == 3:
+            cv2.putText(scaledFrame, 'Triangle', shape_centers[iter_count], font, fontScale, color, thickness)
+            # print('triangle detected')
+        iter_count += 1
+
+    return scaledFrame
 
 def main():
     os.chdir(r"C:\Users\15039\Desktop\School Stuff\MachineLearning\Project\ProjectTest\modelTraining")
@@ -223,20 +252,25 @@ def main():
         success, frame = cap.read()
 
         corners, ids = findArucoMarkers(frame,draw=False)
-        targetMarkers = boundingBox(frame, corners=corners, ids=ids, draw=False)
 
-        inputs = preprocessImage(frame, targetMarkers)
+        if len(corners) == 4: #if all markers are found
 
+            targetMarkers = boundingBox(frame, corners=corners, ids=ids, draw=False)
+            drawnRec, shapes, shape_centers = preprocessImage(frame, targetMarkers)
 
-        if inputs:
-            # print(inputs[0].shape) #the shape is clearly the correct shape at (128x128)
-            # import pdb
-            # pdb.set_trace()
-            # outputs = model.predict(inputs[0])
-            for image in inputs:
+            if shapes:
+                # print(inputs[0].shape) #the shape is clearly the correct shape at (128x128)
+                # import pdb
+                # pdb.set_trace()
+                # outputs = model.predict(inputs[0])
+                allClassifications = []
+                for image in shapes:
 
-                outputs = model.predict(image.reshape((1,128,128))) #model.predict() needs an additional dimension of 1 on the (128,128) image
-                print(outputs)
+                    outputs = model.predict(image.reshape((1,128,128))) #model.predict() needs an additional dimension of 1 on the (128,128) image
+                    allClassifications.append(outputs)
+
+            answerFrame = drawClassifications(drawnRec, MLOutputs=allClassifications, shape_centers=shape_centers)
+            cv2.imshow('classified',answerFrame)
 
         cv2.imshow('Video Feed', frame)
         # cv2.imshow('inputs', inputs[0])
