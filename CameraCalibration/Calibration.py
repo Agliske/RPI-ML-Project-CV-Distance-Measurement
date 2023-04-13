@@ -30,7 +30,7 @@ imgpoints = [] # 2d points in image plane.
 
 
 images = glob.glob('cameraCalibration/Images/*.png')
-
+print(len(images))
 for image in images:
 
     img = cv.imread(image)

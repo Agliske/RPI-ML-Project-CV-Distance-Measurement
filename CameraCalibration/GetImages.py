@@ -15,8 +15,8 @@ while cap.isOpened():
     if k == 27:
         break
     elif k == ord('s'): # wait for 's' key to save and exit
-        os.chdir(r"C:\Users\15039\Desktop\School Stuff\MachineLearning\Project\ProjectTest\CameraCalibration\images")
-        cv2.imwrite('images/img' + str(num) + '.png', img)
+        # os.chdir(r"C:\Users\15039\Desktop\School Stuff\MachineLearning\Project\ProjectTest\CameraCalibration\images")
+        cv2.imwrite('img' + str(num) + '.png', img)
         print("image saved!")
         num += 1
 

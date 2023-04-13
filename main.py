@@ -1,8 +1,9 @@
 # This is a sample Python script.
 import cv2
 import numpy as np
-import PIL
-import matplotlib.pyplot as plt
+import os
+import tensorflow as tf
+
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
@@ -144,20 +145,19 @@ def preprocessImage(frame, targetMarkers):
             avg_pixel_brightness = np.average(grey)
             junk, thresh = cv2.threshold(grey,avg_pixel_brightness,255,cv2.THRESH_BINARY_INV)
 
+            # consider OTSU Threshold***
+
             # import pdb;
             # pdb.set_trace()
 
             contours, heirarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
             # drawncont = cv2.drawContours(resized,contours,-1,(0,255,0), 1)
 
+            cv2.imshow('thresh',thresh)
 
             # contourCleanup()
 
-            inputs = []
-
-            # import pdb;
-            # pdb.set_trace()
-
+            rough_inputs = []
             iter_count = 0
             for cont in contours:
 
@@ -167,28 +167,46 @@ def preprocessImage(frame, targetMarkers):
 
                 cropped_img = current_img[y:y+h, x:x+w]
 
-
-                # 'epilepsy warning if u try to uncomment this block'
-                # cv2.imshow('cropped image',cropped_img)
-                # cv2.waitKey(1)
-
-                inputs.append(cropped_img)
+                cont_area = cv2.contourArea(cont)
+                # print(cont_area)
+                if cont_area > 2500 and cont_area < 8000:
+                    rough_inputs.append(cropped_img)
 
                 iter_count = iter_count + 1
 
+            # resizing image to 128x128
+            inputs = []
+            targetImageWidth = 128
+            targetImageHeight = 128
+            for image in rough_inputs:
 
-            # np.array(inputs)
+                imWidth, imHeight = image.shape
+
+                result = np.full((128, 128), 0, dtype=np.uint8)
+                # result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+
+                x_center = (targetImageWidth - imWidth) // 2
+                y_center = (targetImageHeight - imHeight) // 2
+
+                result[x_center:x_center + imWidth, y_center:y_center + imHeight] = image
+
+                inputs.append(result)
+
+            # print(inputs)
             cv2.imshow('transformed feed', drawnRec)
+            # cv2.imshow(inputs[0])
 
-            rows, cols = len(inputs), 1
-            for i in range(0, len(inputs), rows * cols):
-                fig = plt.figure(figsize=(8, 8))
-                for j in range(0, cols * rows):
-                    fig.add_subplot(rows, cols, j + 1)
-                    plt.imshow(inputs[i + j])
-                plt.show()
+            # rows, cols = len(inputs), 1
+            # for i in range(0, len(inputs), rows * cols):
+            #     fig = plt.figure(figsize=(8, 8))
+            #     for j in range(0, cols * rows):
+            #         fig.add_subplot(rows, cols, j + 1)
+            #         plt.imshow(inputs[i + j])
+            #     plt.show()
 
-            cv2.waitKey(1)
+            k = cv2.waitKey(1)
+            return inputs
+
 
 
 
@@ -196,7 +214,8 @@ def preprocessImage(frame, targetMarkers):
     return None
 
 def main():
-
+    os.chdir(r"C:\Users\15039\Desktop\School Stuff\MachineLearning\Project\ProjectTest\modelTraining")
+    model = tf.keras.models.load_model('model1.h5')
     cap = cv2.VideoCapture(0)
 
     iter_count = 0
@@ -206,17 +225,30 @@ def main():
         corners, ids = findArucoMarkers(frame,draw=False)
         targetMarkers = boundingBox(frame, corners=corners, ids=ids, draw=False)
 
+        inputs = preprocessImage(frame, targetMarkers)
 
-        # import pdb;
-        # pdb.set_trace()
 
-        # print('markercenters = ',MarkerCenters)
+        if inputs:
+            # print(inputs[0].shape) #the shape is clearly the correct shape at (128x128)
+            # import pdb
+            # pdb.set_trace()
+            # outputs = model.predict(inputs[0])
+            for image in inputs:
 
-        preprocessImage(frame, targetMarkers)
+                outputs = model.predict(image.reshape((1,128,128))) #model.predict() needs an additional dimension of 1 on the (128,128) image
+                print(outputs)
 
         cv2.imshow('Video Feed', frame)
-        cv2.waitKey(1)
-        iter_count = iter_count + 1
+        # cv2.imshow('inputs', inputs[0])
+
+
+        k = cv2.waitKey(50)
+        # if inputs:
+        #     if k == ord('s'):  # wait for 's' key to save and exit
+        #         cv2.imwrite('img' + str(iter_count) + '.png', inputs[0])
+        #         print("image saved!")
+        # iter_count = iter_count + 1
+
 
 
 # Press the green button in the gutter to run the script.
